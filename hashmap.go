@@ -68,7 +68,15 @@ func (hm *Hashmap) Get(k interface{}) interface{} {
 	// somewhere 'after' the entry indexed by h, and that no nil keys lie
 	// in between.
 	for i := uint32(0); i < h+c; i++ {
-		// Atomically fetch the data indexed by (i%c).
+		// Atomically fetch the data indexed by (i%c). Since there are
+		// 16 bytes to fetch, this can't be done in a single atomic
+		// operation; however, since a set key can never change, we
+		// don't need perfect atomicity except when fetching the 64
+		// bits of the value.
+		/*e := entry{
+			k: nil,
+			v: nil,
+		}*/
 		e := hm.data[i%c] // TODO atomic
 
 		// Note that at this point, the data in e is incorrect if and
@@ -88,6 +96,9 @@ func (hm *Hashmap) Get(k interface{}) interface{} {
 		// If e.k is nil, it's ok to claim that there's no such
 		// available element.
 		if e.k == nil { return nil }
+
+		// Again, since we know that e.v matched e.k at some point,
+		// it's ok to do this with no further checks.
 		if r.DeepEqual(e.k, k) {
 			return e.v
 		}
