@@ -27,7 +27,7 @@ func TestSimple(t *testing.T) {
 }
 
 func TestCap(t *testing.T) {
-	for i := 5; i < 20; i++ {
+	for i := uint32(5); i < uint32(20); i++ {
 		if x := NewCap(i).Cap(); x != i {
 			t.Errorf("NewCap(%d).Cap() returned %d", x)
 		}
@@ -68,6 +68,13 @@ func BenchmarkRawSet(b *testing.B) {
 	m := newRaw()
 	for i := 0; i < b.N; i++ {
 		m[0] = i
+	}
+}
+
+func BenchmarkSet(b *testing.B) {
+	m := New()
+	for i := 0; i < b.N; i++ {
+		m.Set(0, i)
 	}
 }
 

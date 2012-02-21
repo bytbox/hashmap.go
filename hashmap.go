@@ -2,11 +2,12 @@
 package hashmap
 
 import (
+	a "sync/atomic"
 	r "reflect"
 )
 
 var (
-	defCap = 32
+	defCap = uint32(32)
 )
 
 type entry struct {
@@ -16,30 +17,36 @@ type entry struct {
 
 type Hashmap struct {
 	data []entry
-	size int
-	capc int
+	size uint32
+	capc uint32
 }
 
 func New() *Hashmap {
 	return NewCap(defCap)
 }
 
-func NewCap(c int) *Hashmap {
+func NewCap(c uint32) *Hashmap {
 	return &Hashmap{
 		data: make([]entry, c),
 		size: 0,
-		capc: c,
+		capc: uint32(c),
 	}
 }
 
-func (hm *Hashmap) Cap() int { return hm.capc }
+// Returns the capacity of this hashmap.
+func (hm *Hashmap) Cap() uint32 {
+	return a.LoadUint32(&hm.capc)
+}
 
-func (hm *Hashmap) Size() int { return hm.size }
+// Returns the size of this hashmap.
+func (hm *Hashmap) Size() uint32 {
+	return a.LoadUint32(&hm.size)
+}
 
 func (hm *Hashmap) Get(k interface{}) (interface{}, bool) {
 	c := hm.Cap()
 	h := hash(k, c)
-	for i := 0; i < h+c; i++ {
+	for i := uint32(0); i < h+c; i++ {
 		e := hm.data[i%c]
 		if e.k == nil { return nil, false }
 		if r.DeepEqual(e.k, k) {
@@ -52,7 +59,7 @@ func (hm *Hashmap) Get(k interface{}) (interface{}, bool) {
 func (hm *Hashmap) Set(k interface{}, v interface{}) {
 	c := hm.Cap()
 	h := hash(k, c)
-	for i := 0; i < h+c; i++ {
+	for i := uint32(0); i < h+c; i++ {
 		e := &hm.data[i%c]
 		if e.k == nil {
 			e.v = v
@@ -72,7 +79,7 @@ func (hm *Hashmap) Set(k interface{}, v interface{}) {
 func (hm *Hashmap) Del(k interface{}) bool {
 	c := hm.Cap()
 	h := hash(k, c)
-	for i := 0; i < h+c; i++ {
+	for i := uint32(0); i < h+c; i++ {
 		e := &hm.data[i%c]
 		if r.DeepEqual(e.k, k) {
 			e.k = nil
@@ -84,14 +91,14 @@ func (hm *Hashmap) Del(k interface{}) bool {
 	return false
 }
 
-func (hm *Hashmap) Grow(c int) {
-
+func (hm *Hashmap) Grow(c uint32) {
+	// TODO
 }
 
-func hash(k interface{}, c int) int {
-	switch a := k.(type) {
+func hash(key interface{}, c uint32) uint32 {
+	switch k := key.(type) {
 	case int:
-		return a % c
+		return uint32(k) % c
 	}
-	return 0
+	return uint32(0)
 }
