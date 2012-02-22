@@ -147,7 +147,6 @@ func (hm *Hashmap) Del(k interface{}) bool {
 		if r.DeepEqual(e.k, k) {
 			//e.k = nil
 			e.v = nil
-			hm.size--
 			return true
 		}
 	}
