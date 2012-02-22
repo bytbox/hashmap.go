@@ -1,9 +1,8 @@
 // Package hashmap implements a simple non-blocking (lock-free) hash map.
 //
 // The semantics of this hashmap are quite different from the go built-in.
-// Aside from thread-safety, any values (including structs and slices) are
-// allowed as keys, and a value of nil is indestinguishable from an element not
-// being in the map.
+// In particular, any values (including structs and slices) are
+// allowed as keys.
 package hashmap
 
 import (
@@ -15,8 +14,13 @@ var (
 	defCap = uint32(32)
 )
 
+const (
+	fexists = 1 << iota
+)
+
 // A hashmap entry.
 type entry struct {
+	f uint32
 	k interface{}
 	v interface{}
 }
@@ -73,6 +77,10 @@ func (hm *Hashmap) Get(k interface{}) interface{} {
 		// operation; however, since a set key can never change, we
 		// don't need perfect atomicity except when fetching the 64
 		// bits of the value.
+
+		// Load atomically.
+		// ek := a.LoadUintptr((*uintptr)(u.Pointer(&hm.data[i%c].k)))
+		// ev := a.LoadUintptr((*uintptr)(u.Pointer(&hm.data[i%c].v)))
 		/*e := entry{
 			k: nil,
 			v: nil,
@@ -109,6 +117,7 @@ func (hm *Hashmap) Get(k interface{}) interface{} {
 	return nil
 }
 
+// The key will be (shallowly) copied - the value will not.
 func (hm *Hashmap) Set(k interface{}, v interface{}) {
 	c := hm.Capacity()
 	h := hash(k, c)
