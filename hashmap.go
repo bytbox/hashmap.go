@@ -17,6 +17,7 @@ var (
 
 // A hashmap entry.
 type entry struct {
+	i uint32
 	k interface{}
 	v interface{}
 }
