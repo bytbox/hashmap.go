@@ -1,8 +1,9 @@
 // Package hashmap implements a simple non-blocking (lock-free) hash map.
 //
 // The semantics of this hashmap are quite different from the go built-in.
-// In particular, any values (including structs and slices) are
-// allowed as keys.
+// Aside from thread-safety, any values (including structs and slices) are
+// allowed as keys, and a value of nil is indestinguishable from an element not
+// being in the map.
 package hashmap
 
 import (
@@ -14,13 +15,8 @@ var (
 	defCap = uint32(32)
 )
 
-const (
-	fexists = 1 << iota
-)
-
 // A hashmap entry.
 type entry struct {
-	f uint32
 	k interface{}
 	v interface{}
 }
