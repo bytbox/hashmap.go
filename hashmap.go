@@ -110,7 +110,7 @@ Retry:
 	}
 
 	// Really, this should never happen; it just means we've cycled through
-	// the whole map, and none of the keys were nil
+	// the whole map, and none of the keys were nil.
 	return nil
 }
 
