@@ -6,7 +6,7 @@ import (
 
 // We do not attempt to test for race conditions. A pseudo-formal proof of
 // correctness is provided in the comments to waitmap.go - that will have to
-// do.
+// do. These tests only test single-threaded functionality.
 //
 // In the future, it might be wise to create a script to insert calls to
 // runtime.Gosched() between every pair of lines, which should (coupled with

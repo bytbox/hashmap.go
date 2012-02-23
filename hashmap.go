@@ -9,6 +9,7 @@ package hashmap
 import (
 	a "sync/atomic"
 	r "reflect"
+	u "unsafe"
 )
 
 var (
@@ -17,9 +18,9 @@ var (
 
 // A hashmap entry.
 type entry struct {
-	i uint32
+	f uint32
 	k interface{}
-	v interface{}
+	v *interface{}
 }
 
 type Hashmap struct {
@@ -56,6 +57,7 @@ func (hm *Hashmap) Size() uint32 {
 }
 
 func (hm *Hashmap) Get(k interface{}) interface{} {
+Retry:
 	// If the map changes capacity during the operation, we will detect
 	// that and retry. Note that the only legal transformation of this
 	// value is for it to increase (double), so we can easily check to see
@@ -72,40 +74,38 @@ func (hm *Hashmap) Get(k interface{}) interface{} {
 		// Atomically fetch the data indexed by (i%c). Since there are
 		// 16 bytes to fetch, this can't be done in a single atomic
 		// operation; however, since a set key can never change, we
-		// don't need perfect atomicity except when fetching the 64
-		// bits of the value.
+		// don't need perfect atomicity when fetching it.
 
-		// Load atomically.
-		// ek := a.LoadUintptr((*uintptr)(u.Pointer(&hm.data[i%c].k)))
-		// ev := a.LoadUintptr((*uintptr)(u.Pointer(&hm.data[i%c].v)))
-		/*e := entry{
-			k: nil,
-			v: nil,
-		}*/
-		e := hm.data[i%c] // TODO atomic
+		ef := a.LoadUint32(&hm.data[i%c].f)
+		if ef == 0 {
+			// The key is not set; there's no such element.
+			return nil
+		}
 
-		// Note that at this point, the data in e is incorrect if and
-		// only if the capacity has changed (and the map has therefore
-		// been expanded). We now check to see if that has happened,
-		// and if so, abort.
+		// The key is set and can never change - fetch it
+		// non-atomically.
+		ek := hm.data[i%c].k
+
+		// Load value atomically
+		evp := u.Pointer(hm.data[i%c].v)
+		ev := (*interface{})(a.LoadPointer(&evp))
+
+		// Note that at this point, the collect data is incorrect if
+		// and only if the capacity has changed (and the map has
+		// therefore been expanded). We now check to see if that has
+		// happened, and if so, abort.
 		if c != hm.Capacity() {
 			// This is the part that breaks our per-goroutine
 			// progress guarantee.
-			return hm.Get(k)
+			goto Retry
 		}
 
-		// The data in e may now be considered actionable. Since e is
-		// stored in local memory, we don't have to worry about making
-		// further operations atomic.
+		// The data (ek, ev) may now be considered actionable. Since it
+		// is stored in local memory, we don't have to worry about
+		// making further operations atomic.
 
-		// If e.k is nil, it's ok to claim that there's no such
-		// available element.
-		if e.k == nil { return nil }
-
-		// Again, since we know that e.v matched e.k at some point,
-		// it's ok to do this with no further checks.
-		if r.DeepEqual(e.k, k) {
-			return e.v
+		if r.DeepEqual(ek, k) {
+			return *ev
 		}
 	}
 
@@ -121,14 +121,15 @@ func (hm *Hashmap) Set(k interface{}, v interface{}) {
 	for i := uint32(0); i < h+c; i++ {
 		e := &hm.data[i%c]
 		if e.k == nil {
-			e.v = v
+			e.f = 1
+			e.v = &v
 			e.k = k
 			hm.size++
 			// TODO Grow if necessary
 			return
 		}
 		if r.DeepEqual(e.k, k) {
-			e.v = v
+			e.v = &v
 			return
 		}
 	}
@@ -146,6 +147,7 @@ func (hm *Hashmap) Del(k interface{}) bool {
 		e := &hm.data[i%c]
 		if r.DeepEqual(e.k, k) {
 			//e.k = nil
+			e.f = 0
 			e.v = nil
 			return true
 		}
