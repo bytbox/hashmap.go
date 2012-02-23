@@ -105,6 +105,7 @@ Retry:
 		// making further operations atomic.
 
 		if r.DeepEqual(ek, k) {
+			if ev == nil { return nil }
 			return *ev
 		}
 	}
@@ -116,10 +117,22 @@ Retry:
 
 // The key will be (shallowly) copied - the value will not.
 func (hm *Hashmap) Set(k interface{}, v interface{}) {
+Retry:
 	c := hm.Capacity()
 	h := hash(k, c)
 	for i := uint32(0); i < h+c; i++ {
 		e := &hm.data[i%c]
+		ef := a.LoadUint32(&e.f)
+
+		if c != hm.Capacity() {
+			goto Retry
+		}
+		if ef == 0 {
+
+		} else if r.DeepEqual(e.k, k) {
+			// Atomically write the value
+			return
+		}
 		if e.k == nil {
 			e.f = 1
 			e.v = &v
@@ -141,13 +154,22 @@ func (hm *Hashmap) Set(k interface{}, v interface{}) {
 // not allocate another key if the key is not already in use, and should
 // therefore be used instead.
 func (hm *Hashmap) Del(k interface{}) bool {
+Retry:
 	c := hm.Capacity()
 	h := hash(k, c)
 	for i := uint32(0); i < h+c; i++ {
 		e := &hm.data[i%c]
+		ef := a.LoadUint32(&e.f)
+
+		if c != hm.Capacity() {
+			goto Retry
+		}
+
+		if ef == 0 {
+			return false
+		}
+
 		if r.DeepEqual(e.k, k) {
-			//e.k = nil
-			e.f = 0
 			e.v = nil
 			return true
 		}
